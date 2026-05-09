@@ -7,7 +7,12 @@ from pathlib import Path
 import pytest
 
 from hip3_bot.config import Config
-from hip3_bot.models import FundingSnapshot, HedgeVenue, Position
+from hip3_bot.models import (
+    FundingSnapshot,
+    Mode,
+    OstiumSnapshot,
+    Position,
+)
 
 
 @pytest.fixture
@@ -68,23 +73,44 @@ def make_snapshot(
     )
 
 
+def make_ostium_snapshot(
+    *,
+    coin: str = "WTI",
+    listed: bool = True,
+    apr_pct: float = 5.0,
+    mark_price: float = 80.0,
+    lp_liquidity_usd: float = 100_000.0,
+) -> OstiumSnapshot:
+    funding_8h = apr_pct / (3 * 365 * 100)
+    return OstiumSnapshot(
+        coin=coin,
+        listed=listed,
+        funding_8h=funding_8h,
+        annualized_apr_pct=apr_pct,
+        mark_price=mark_price,
+        lp_liquidity_usd=lp_liquidity_usd,
+        timestamp=datetime.utcnow(),
+    )
+
+
 def make_position(
     *,
     coin: str = "WTI",
     notional_usd: float = 10_000.0,
     hip3_size: float = -125.0,
-    hedge_size: float = 125.0,
+    ostium_size: float = 125.0,
     hip3_entry: float = 80.0,
-    hedge_entry: float = 80.0,
+    ostium_entry: float = 80.0,
+    mode: Mode = Mode.SCANNER,
 ) -> Position:
     return Position(
         id="p1",
         coin=coin,
-        hedge_venue=HedgeVenue.PAPER,
+        mode=mode,
         hip3_size=hip3_size,
-        hedge_size=hedge_size,
+        ostium_size=ostium_size,
         hip3_entry_price=hip3_entry,
-        hedge_entry_price=hedge_entry,
+        ostium_entry_price=ostium_entry,
         notional_usd=notional_usd,
-        entry_apr_pct=25.0,
+        entry_net_apr_pct=20.0,
     )

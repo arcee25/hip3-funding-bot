@@ -6,15 +6,16 @@ from datetime import datetime
 from enum import Enum
 
 
-class HedgeVenue(str, Enum):
-    IBKR = "ibkr"
-    HL_NATIVE = "hl_native"
+class Mode(str, Enum):
+    SCANNER = "scanner"
     PAPER = "paper"
+    LIVE = "live"
 
 
 class ExitReason(str, Enum):
     DEPLOYER_HALT = "P0_deployer_halt"
     FUNDING_FLIP = "P1_funding_flip"
+    OSTIUM_HOSTILE = "P1b_ostium_hostile"
     APR_DECAY = "P2_apr_decay"
     DELTA_REBALANCE = "P3_delta_rebalance"
     PLANNED_ROTATION = "P4_planned"
@@ -31,6 +32,8 @@ class Market:
 
 @dataclass
 class FundingSnapshot:
+    """Hyperliquid HIP-3 perp snapshot (the short leg)."""
+
     coin: str
     funding_8h: float
     annualized_apr_pct: float
@@ -42,16 +45,29 @@ class FundingSnapshot:
 
 
 @dataclass
+class OstiumSnapshot:
+    """Ostium perp snapshot (the long hedge leg)."""
+
+    coin: str
+    listed: bool
+    funding_8h: float                  # Ostium long-side funding rate
+    annualized_apr_pct: float
+    mark_price: float
+    lp_liquidity_usd: float            # available LP in long-direction
+    timestamp: datetime
+
+
+@dataclass
 class Position:
     id: str
     coin: str
-    hedge_venue: HedgeVenue
+    mode: Mode
     hip3_size: float
-    hedge_size: float
+    ostium_size: float
     hip3_entry_price: float
-    hedge_entry_price: float
+    ostium_entry_price: float
     notional_usd: float
-    entry_apr_pct: float
+    entry_net_apr_pct: float
     fees_paid_bps: float = 0.0
     funding_received_usd: float = 0.0
     opened_at: datetime = field(default_factory=datetime.utcnow)
