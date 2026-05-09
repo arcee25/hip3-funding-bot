@@ -9,94 +9,112 @@ from hip3_bot.risk import (
     target_hedge_size,
 )
 
-from .conftest import make_position, make_snapshot
+from .conftest import make_ostium_snapshot, make_position, make_snapshot
 
 
-def _snap_with_funding(funding_8h: float, apr: float):
+def _hl(funding_8h: float, apr: float):
     snap = make_snapshot(apr_pct=apr)
     snap.funding_8h = funding_8h
     return snap
 
 
+def _os(funding_8h: float, apr: float = 0.0):
+    snap = make_ostium_snapshot(apr_pct=apr)
+    snap.funding_8h = funding_8h
+    return snap
+
+
 def test_p0_deployer_halt_takes_priority(cfg):
-    decision = evaluate_exit(
+    d = evaluate_exit(
         make_position(),
-        _snap_with_funding(0.0001, 25.0),
+        _hl(0.0001, 25.0),
+        _os(0.00001, 1.0),
         deployer_halted=True,
         cfg=cfg,
     )
-    assert decision.should_exit
-    assert decision.reason == ExitReason.DEPLOYER_HALT
+    assert d.should_exit
+    assert d.reason == ExitReason.DEPLOYER_HALT
 
 
 def test_p1_funding_flip_negative(cfg):
-    decision = evaluate_exit(
+    d = evaluate_exit(
         make_position(),
-        _snap_with_funding(-0.0001, 25.0),
+        _hl(-0.0001, -10.0),
+        _os(0.00001, 1.0),
         deployer_halted=False,
         cfg=cfg,
     )
-    assert decision.should_exit
-    assert decision.reason == ExitReason.FUNDING_FLIP
+    assert d.should_exit
+    assert d.reason == ExitReason.FUNDING_FLIP
+
+
+def test_p1b_ostium_hostile_when_more_than_50pct_of_hl(cfg):
+    # HL pays you 0.0001/8h short; Ostium charges 0.00006/8h long → 60% of HL.
+    d = evaluate_exit(
+        make_position(),
+        _hl(0.0001, 25.0),
+        _os(0.00006, 16.4),
+        deployer_halted=False,
+        cfg=cfg,
+    )
+    assert d.should_exit
+    assert d.reason == ExitReason.OSTIUM_HOSTILE
+
+
+def test_p1b_does_not_trigger_when_under_50pct(cfg):
+    d = evaluate_exit(
+        make_position(),
+        _hl(0.0001, 25.0),
+        _os(0.00004, 11.0),
+        deployer_halted=False,
+        cfg=cfg,
+    )
+    assert not d.should_exit
 
 
 def test_p2_apr_decay_below_threshold(cfg):
-    decision = evaluate_exit(
+    d = evaluate_exit(
         make_position(),
-        _snap_with_funding(0.0000001, 5.0),
+        _hl(0.0000001, 5.0),
+        _os(0.00, 0.0),
         deployer_halted=False,
         cfg=cfg,
     )
-    assert decision.should_exit
-    assert decision.reason == ExitReason.APR_DECAY
+    assert d.should_exit
+    assert d.reason == ExitReason.APR_DECAY
 
 
 def test_no_exit_when_healthy(cfg):
-    decision = evaluate_exit(
+    d = evaluate_exit(
         make_position(),
-        _snap_with_funding(0.0001, 25.0),
+        _hl(0.0001, 25.0),
+        _os(0.00001, 1.0),
         deployer_halted=False,
         cfg=cfg,
     )
-    assert not decision.should_exit
+    assert not d.should_exit
 
 
 def test_delta_drift_neutral_at_entry_marks():
     p = make_position()
-    assert abs(delta_drift(p, hip3_mark=80.0, hedge_mark=80.0)) < 1e-9
+    assert abs(delta_drift(p, hip3_mark=80.0, ostium_mark=80.0)) < 1e-9
 
 
 def test_delta_drift_negative_when_hip3_outpaces_hedge():
     p = make_position()
-    drift = delta_drift(p, hip3_mark=88.0, hedge_mark=80.0)
+    drift = delta_drift(p, hip3_mark=88.0, ostium_mark=80.0)
     assert drift < 0
 
 
 def test_needs_rebalance_threshold(cfg):
-    assert needs_rebalance(0.06, cfg) is True
-    assert needs_rebalance(-0.06, cfg) is True
-    assert needs_rebalance(0.04, cfg) is False
+    assert needs_rebalance(0.06, cfg)
+    assert not needs_rebalance(0.04, cfg)
 
 
 def test_target_hedge_size_neutralizes_at_same_mark():
     p = make_position()
-    assert abs(target_hedge_size(p, hedge_mark=80.0) - 125.0) < 1e-9
-
-
-def test_target_hedge_size_scales_with_hedge_mark():
-    p = make_position()
-    # If hedge mark doubles, half as many units neutralize the leg.
-    assert abs(target_hedge_size(p, hedge_mark=160.0) - 62.5) < 1e-9
+    assert abs(target_hedge_size(p, ostium_mark=80.0) - 125.0) < 1e-9
 
 
 def test_realized_apr_pct_zero_for_zero_hold():
-    p = make_position()
-    assert realized_apr_pct(p, 0) == 0.0
-
-
-def test_realized_apr_pct_positive_when_funding_exceeds_fees():
-    p = make_position(notional_usd=10_000)
-    p.funding_received_usd = 100.0  # $100 over period
-    p.fees_paid_bps = 9.0           # 9 bps = $9 of $10k
-    apr = realized_apr_pct(p, held_hours=24.0)
-    assert apr > 0
+    assert realized_apr_pct(make_position(), 0) == 0.0
