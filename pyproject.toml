@@ -1,0 +1,33 @@
+[project]
+name = "hip3-funding-bot"
+version = "0.1.0"
+description = "Delta-neutral funding rate farming bot for Hyperliquid HIP-3 perpetual markets"
+requires-python = ">=3.11"
+dependencies = [
+    "hyperliquid-python-sdk>=0.7.0",
+    "ib_insync>=0.9.86",
+    "pandas>=2.0",
+    "numpy>=1.24",
+    "aiohttp>=3.9",
+    "python-telegram-bot>=21.0",
+    "APScheduler>=3.10",
+    "python-dotenv>=1.0",
+    "eth-account>=0.10",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=7.0", "pytest-asyncio>=0.21"]
+
+[project.scripts]
+hip3-bot = "hip3_bot.main:cli"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["hip3_bot*"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
