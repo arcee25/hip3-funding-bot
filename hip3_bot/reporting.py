@@ -1,18 +1,23 @@
-"""Layer 5 — daily APR realized vs. projected report."""
+"""Layer 5 — daily realized vs projected APR report."""
 from __future__ import annotations
 
 from datetime import datetime
 
 from .db import Database
+from .models import Mode
 from .risk import realized_apr_pct
 
 
-def daily_report(db: Database, now: datetime | None = None) -> str:
+def daily_report(
+    db: Database, mode: Mode, now: datetime | None = None
+) -> str:
     now = now or datetime.utcnow()
-    open_positions = db.open_positions()
-    closed = db.closed_in_last_day(now)
+    open_positions = db.open_positions(mode)
+    closed = db.closed_in_last_day(mode, now)
 
-    lines = [f"📊 *Daily Report* — {now:%Y-%m-%d %H:%M}Z"]
+    lines = [
+        f"📊 Daily Report ({mode.value}) — {now:%Y-%m-%d %H:%M}Z"
+    ]
     lines.append(f"Open positions: {len(open_positions)}")
 
     for p in open_positions:
@@ -20,7 +25,7 @@ def daily_report(db: Database, now: datetime | None = None) -> str:
         realized = realized_apr_pct(p, held_h)
         lines.append(
             f"  • {p.coin}: ${p.notional_usd:,.0f}  "
-            f"projected {p.entry_apr_pct:.1f}%  "
+            f"projected {p.entry_net_apr_pct:.1f}%  "
             f"realized {realized:.1f}%  "
             f"held {held_h:.1f}h"
         )
@@ -34,5 +39,4 @@ def daily_report(db: Database, now: datetime | None = None) -> str:
                 f"  • {p.coin}: ${p.realized_pnl_usd:+,.2f}  "
                 f"reason {p.exit_reason.value if p.exit_reason else '-'}"
             )
-
     return "\n".join(lines)
