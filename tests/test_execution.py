@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -60,11 +60,12 @@ def test_fill_dataclass_defaults():
 
 
 def _ostium_adapter_returning(price: float, size: float) -> OstiumHedgeAdapter:
-    client = MagicMock()
+    client = AsyncMock()
     client.open_long.return_value = {
         "fill_price": price,
         "size": size,
         "fees_usd": 0.0,
+        "trade_index": 7,
     }
     client.close_long.return_value = {
         "fill_price": price,
@@ -126,8 +127,34 @@ async def test_rebalance_hedge_no_op_when_target_matches(cfg):
 
 
 @pytest.mark.asyncio
-async def test_ostium_adapter_buy_calls_client():
+async def test_ostium_adapter_buy_returns_trade_index():
     adapter = _ostium_adapter_returning(price=80.0, size=100.0)
     fill = await adapter.buy("WTI", 8_000.0)
     assert fill.price == 80.0
     assert fill.size == 100.0
+    assert fill.trade_index == 7
+
+
+@pytest.mark.asyncio
+async def test_ostium_adapter_sell_requires_trade_index():
+    adapter = _ostium_adapter_returning(price=80.0, size=100.0)
+    with pytest.raises(RuntimeError, match="trade_index is required"):
+        await adapter.sell("WTI", 100.0, None)
+
+
+@pytest.mark.asyncio
+async def test_ostium_adapter_sell_uses_trade_index():
+    adapter = _ostium_adapter_returning(price=80.0, size=100.0)
+    fill = await adapter.sell("WTI", 100.0, trade_index=7)
+    assert fill.price == 80.0
+    assert fill.size == 100.0
+
+
+@pytest.mark.asyncio
+async def test_scanner_position_has_no_trade_index(cfg):
+    info = MagicMock()
+    info.all_mids.return_value = {"WTI": "80.0"}
+    router = OrderRouter(cfg, exchange=None, info=info, ostium=None)
+    pos = await router.open_delta_neutral("WTI", 8_000.0, 20.0)
+    assert pos is not None
+    assert pos.ostium_trade_index is None

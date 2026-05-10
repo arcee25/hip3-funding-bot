@@ -1,7 +1,6 @@
 """Layer 1 — Ostium perp feed (Arbitrum, web3-based)."""
 from __future__ import annotations
 
-import asyncio
 import logging
 from datetime import datetime
 from typing import Protocol
@@ -13,17 +12,26 @@ logger = logging.getLogger(__name__)
 
 
 class OstiumClient(Protocol):
-    """Thin protocol for Ostium router calls.
+    """Async protocol for the Ostium router/SDK wrapper.
 
-    The production implementation wraps `web3.py` against the Ostium
-    router contract on Arbitrum. Each call resolves to the on-chain
-    market struct for ``coin``: ``{"listed": bool, "funding_8h": float,
-    "mark_price": float, "lp_long_usd": float}``.
+    ``get_market(coin)`` resolves the coin string (e.g. ``"WTI"``) to a
+    market struct: ``{"listed": bool, "funding_8h": float, "mark_price":
+    float, "lp_long_usd": float}`` or ``None`` when not listed.
 
-    Tests pass a ``MagicMock`` shaped like this protocol.
+    Production: see ``hip3_bot._ostium_router.OstiumRouterClient`` (Task 5),
+    backed by ``ostium-python-sdk``. Tests pass an ``AsyncMock``.
     """
 
-    def get_market(self, coin: str) -> dict | None: ...
+    async def get_market(self, coin: str) -> dict | None: ...
+
+    async def open_long(
+        self,
+        coin: str,
+        notional_usd: float,
+        max_slippage_bps: float,
+    ) -> dict: ...
+
+    async def close_long(self, coin: str, trade_index: int) -> dict: ...
 
 
 class OstiumDataFeed:
@@ -32,17 +40,14 @@ class OstiumDataFeed:
         self._client = client if client is not None else self._build_client()
 
     def _build_client(self) -> OstiumClient:
-        # Lazy import so unit tests don't require web3.
-        from web3 import Web3
+        # Lazy import so unit tests don't require ostium-python-sdk.
+        from ._ostium_router import OstiumRouterClient
 
-        from ._ostium_router import RouterClient
-
-        w3 = Web3(Web3.HTTPProvider(self.cfg.ostium_rpc_url))
-        return RouterClient(w3, self.cfg.ostium_router_address)
+        return OstiumRouterClient.from_config(self.cfg)
 
     async def snapshot(self, coin: str) -> OstiumSnapshot:
         try:
-            payload = await asyncio.to_thread(self._client.get_market, coin)
+            payload = await self._client.get_market(coin)
         except Exception:
             logger.exception("Ostium get_market failed for %s", coin)
             payload = None

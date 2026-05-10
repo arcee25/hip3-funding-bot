@@ -22,6 +22,7 @@ class Fill:
     price: float
     size: float
     fees_paid_usd: float = 0.0
+    trade_index: int | None = None
 
 
 def _parse_hl_fill(
@@ -106,6 +107,7 @@ class OrderRouter:
             mode=Mode(self.cfg.mode),
             hip3_size=-leg_a.size,
             ostium_size=leg_b.size,
+            ostium_trade_index=leg_b.trade_index,
             hip3_entry_price=leg_a.price,
             ostium_entry_price=leg_b.price,
             notional_usd=notional_usd,
@@ -123,7 +125,7 @@ class OrderRouter:
             return
         leg_a, leg_b = await asyncio.gather(
             self._cover_hip3(p),
-            self._ostium.sell(p.coin, abs(p.ostium_size)),
+            self._ostium.sell(p.coin, abs(p.ostium_size), p.ostium_trade_index),
             return_exceptions=True,
         )
         if isinstance(leg_a, Exception):
@@ -144,7 +146,7 @@ class OrderRouter:
             return await self._ostium.buy(
                 p.coin, delta * p.ostium_entry_price
             )
-        return await self._ostium.sell(p.coin, -delta)
+        return await self._ostium.sell(p.coin, -delta, p.ostium_trade_index)
 
     async def _short_hip3(
         self, coin: str, size: float, mark: float
@@ -217,7 +219,7 @@ class OrderRouter:
                 logger.exception("partial unwind A failed")
         if isinstance(leg_b, Fill) and leg_b.size > 0 and self._ostium is not None:
             try:
-                await self._ostium.sell(coin, leg_b.size)
+                await self._ostium.sell(coin, leg_b.size, leg_b.trade_index)
             except Exception:
                 logger.exception("partial unwind B failed")
 
