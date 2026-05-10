@@ -108,3 +108,15 @@ def test_log_event_persists(cfg):
         rows = c.execute("SELECT kind, data FROM events").fetchall()
     assert len(rows) == 1
     assert rows[0]["kind"] == "entry"
+
+
+def test_ostium_trade_index_round_trips(cfg):
+    db = Database(cfg.db_path)
+    p = make_position(mode=Mode.PAPER)
+    p.ostium_trade_index = 42  # set via attribute
+    db.upsert_position(p)
+    fetched = db.open_position_for("WTI", Mode.PAPER)
+    assert fetched is not None
+    # Position doesn't yet have ostium_trade_index field (Task 3 adds it),
+    # but `_row_to_position` sets it as an attribute when present.
+    assert getattr(fetched, "ostium_trade_index", None) == 42

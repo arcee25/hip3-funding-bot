@@ -16,6 +16,7 @@ POSITION_COLS = """
     mode TEXT NOT NULL,
     hip3_size REAL NOT NULL,
     ostium_size REAL NOT NULL,
+    ostium_trade_index INTEGER,
     hip3_entry_price REAL NOT NULL,
     ostium_entry_price REAL NOT NULL,
     notional_usd REAL NOT NULL,
@@ -78,6 +79,16 @@ class Database:
             path.parent.mkdir(parents=True, exist_ok=True)
         with self._conn() as c:
             c.executescript(SCHEMA)
+        # Backwards compat: pre-Phase-3 DBs lack ostium_trade_index.
+        for table in ("trade_log", "simulated_trade_log"):
+            try:
+                with self._conn() as c:
+                    c.execute(
+                        f"ALTER TABLE {table} ADD COLUMN "
+                        "ostium_trade_index INTEGER"
+                    )
+            except sqlite3.OperationalError:
+                pass  # column already exists
 
     @contextmanager
     def _conn(self) -> Iterator[sqlite3.Connection]:
@@ -184,30 +195,27 @@ class Database:
         with self._conn() as c:
             c.execute(
                 f"INSERT INTO {table}(id,coin,mode,hip3_size,ostium_size,"
+                "ostium_trade_index,"
                 "hip3_entry_price,ostium_entry_price,notional_usd,"
                 "entry_net_apr_pct,fees_paid_bps,funding_received_usd,"
                 "opened_at,closed_at,exit_reason,realized_pnl_usd) "
-                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) "
+                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) "
                 "ON CONFLICT(id) DO UPDATE SET "
                 "hip3_size=excluded.hip3_size,"
                 "ostium_size=excluded.ostium_size,"
+                "ostium_trade_index=excluded.ostium_trade_index,"
                 "fees_paid_bps=excluded.fees_paid_bps,"
                 "funding_received_usd=excluded.funding_received_usd,"
                 "closed_at=excluded.closed_at,"
                 "exit_reason=excluded.exit_reason,"
                 "realized_pnl_usd=excluded.realized_pnl_usd",
                 (
-                    p.id,
-                    p.coin,
-                    p.mode.value,
-                    p.hip3_size,
-                    p.ostium_size,
-                    p.hip3_entry_price,
-                    p.ostium_entry_price,
-                    p.notional_usd,
-                    p.entry_net_apr_pct,
-                    p.fees_paid_bps,
-                    p.funding_received_usd,
+                    p.id, p.coin, p.mode.value,
+                    p.hip3_size, p.ostium_size,
+                    getattr(p, "ostium_trade_index", None),
+                    p.hip3_entry_price, p.ostium_entry_price,
+                    p.notional_usd, p.entry_net_apr_pct,
+                    p.fees_paid_bps, p.funding_received_usd,
                     p.opened_at.isoformat(),
                     p.closed_at.isoformat() if p.closed_at else None,
                     p.exit_reason.value if p.exit_reason else None,
@@ -228,7 +236,7 @@ class Database:
 
 
 def _row_to_position(r: sqlite3.Row) -> Position:
-    return Position(
+    pos = Position(
         id=r["id"],
         coin=r["coin"],
         mode=Mode(r["mode"]),
@@ -249,3 +257,10 @@ def _row_to_position(r: sqlite3.Row) -> Position:
         ),
         realized_pnl_usd=r["realized_pnl_usd"],
     )
+    # Tolerant of pre-Phase-3 rows: column may be NULL or (after Task 3)
+    # the field exists on Position with a default. Position has no
+    # __slots__, so we can set the attribute unconditionally; this works
+    # both before Task 3 (attribute added dynamically) and after Task 3
+    # (overwrites the default field value).
+    pos.ostium_trade_index = dict(r).get("ostium_trade_index")
+    return pos
