@@ -59,4 +59,12 @@ size = min(kelly_f * 0.25, 0.10) * capital
 
 ## Build Phases
 
-Phase 1 (scanner mode + alerts), Phase 2 (paper trading on HL testnet + Ostium Sepolia), Phase 3 (live with 5-10% capital + `--confirm-live` flag), Phase 4 (multi-market rotation + cross-venue capital auto-rebalance). See `hip3-funding-bot-spec.md` for full v1.1 details.
+Phase 1 (scanner mode + alerts) ✅; Phase 2 (paper trading on HL testnet + Ostium Sepolia) — code complete, pending live Sepolia smoke; Phase 3 (live with 5-10% capital + `--confirm-live` flag) — Ostium SDK now wired (`hip3_bot._ostium_router.OstiumRouterClient` over `ostium-python-sdk`); pre-funded margin guardrail still TODO; Phase 4 (multi-market rotation + cross-venue capital auto-rebalance) deferred.
+
+## Where the Ostium leg is wired
+
+- `hip3_bot/_ostium_router.py` — `OstiumRouterClient` (real, SDK-backed) + `PairResolver` (coin → pair_id, async-locked cache of `subgraph.get_pairs()`).
+- `hip3_bot/ostium_feed.py` — async `OstiumDataFeed.snapshot(coin)` using the router client; the `OstiumClient` Protocol is async-only.
+- `hip3_bot/ostium_adapter.py` — async `OstiumHedgeAdapter.buy/sell`; `Fill.trade_index` is returned from `buy`, required on `sell`.
+- `hip3_bot/execution.py` — `OrderRouter` persists `trade_index` on `Position.ostium_trade_index` from the open's `Fill`, and threads it back into `close_delta_neutral`, `_unwind_partial`, and `rebalance_hedge` calls.
+- Field names for funding rate (`FUNDING_FIELDS`) and LP liquidity (`LP_FIELDS`) on the Ostium subgraph payload are best-effort candidates pending Sepolia smoke verification (see `docs/superpowers/plans/2026-05-10-hip3-funding-bot-phase3-ostium.md` Task 6).
