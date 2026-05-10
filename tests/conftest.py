@@ -102,6 +102,7 @@ def make_position(
     hip3_entry: float = 80.0,
     ostium_entry: float = 80.0,
     mode: Mode = Mode.SCANNER,
+    ostium_trade_index: int | None = None,
 ) -> Position:
     return Position(
         id="p1",
@@ -109,6 +110,7 @@ def make_position(
         mode=mode,
         hip3_size=hip3_size,
         ostium_size=ostium_size,
+        ostium_trade_index=ostium_trade_index,
         hip3_entry_price=hip3_entry,
         ostium_entry_price=ostium_entry,
         notional_usd=notional_usd,

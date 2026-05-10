@@ -64,10 +64,11 @@ class Position:
     mode: Mode
     hip3_size: float
     ostium_size: float
-    hip3_entry_price: float
-    ostium_entry_price: float
-    notional_usd: float
-    entry_net_apr_pct: float
+    ostium_trade_index: int | None = None
+    hip3_entry_price: float = 0.0
+    ostium_entry_price: float = 0.0
+    notional_usd: float = 0.0
+    entry_net_apr_pct: float = 0.0
     fees_paid_bps: float = 0.0
     funding_received_usd: float = 0.0
     opened_at: datetime = field(default_factory=datetime.utcnow)
