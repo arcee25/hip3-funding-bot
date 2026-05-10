@@ -1,5 +1,7 @@
 # HIP-3 Funding Rate Farming Bot Implementation Plan
 
+> **Superseded by [2026-05-10-hip3-funding-bot-v1.1-migration.md](2026-05-10-hip3-funding-bot-v1.1-migration.md)** for spec v1.1 (Ostium hedge, 6-condition gate, runtime modes).
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Build a Python 3.11+ delta-neutral funding rate farming bot for Hyperliquid HIP-3 perpetuals — scanner first, then paper trading, then live with hedge.
