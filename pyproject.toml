@@ -5,7 +5,7 @@ description = "Delta-neutral funding rate farming bot for Hyperliquid HIP-3 perp
 requires-python = ">=3.11"
 dependencies = [
     "hyperliquid-python-sdk>=0.7.0",
-    "ib_insync>=0.9.86",
+    "ostium-python-sdk>=3.2.0",
     "pandas>=2.0",
     "numpy>=1.24",
     "aiohttp>=3.9",
