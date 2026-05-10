@@ -68,11 +68,9 @@ class Bot:
         if self.mode is Mode.SCANNER:
             return None
         try:
-            from ._ostium_router import RouterClient
-            from web3 import Web3
+            from ._ostium_router import OstiumRouterClient
 
-            w3 = Web3(Web3.HTTPProvider(self.cfg.ostium_rpc_url))
-            client = RouterClient(w3, self.cfg.ostium_router_address)
+            client = OstiumRouterClient.from_config(self.cfg)
             return OstiumHedgeAdapter(
                 client, max_slippage_bps=self.cfg.ostium_max_slippage_bps
             )
